@@ -1,0 +1,44 @@
+<syncdefinition>
+<local>
+  <host>localhost</host>
+  <brightport>8081</brightport>
+
+  <brightcert>
+    <pemfile>/root/.cm/admin.pem</pemfile>
+    <keyfile>/root/.cm/admin.key</keyfile>
+  </brightcert>
+</local>
+
+<cluster array="yes">
+  <name>Test Cluster</name>
+  <host>10.2.59.120</host>
+  <brightport>8081</brightport>
+  <sshport>22</sshport>
+
+  <brightcert>
+    <pemfile>/root/tst/.cm/admin.pem</pemfile>
+    <keyfile>/root/tst/.cm/admin.key</keyfile>
+  </brightcert>
+
+  <!-- 
+  Replicate the software image "replicate-image" from the master cluster to the replica cluster.
+  -->
+  <action>
+    <name>sync</name>
+    <type>softwareimage</type>
+    <src>test-image</src>
+    <dest>test-image</dest>
+  </action>
+  <action>
+    <name>sync</name>
+    <type>category</type>
+    <src>replica</src>
+    <dest>replica</dest>
+  </action> 
+  <fsexclude>
+    <fs>/home</fs>
+    <fs>/cm/shared</fs>
+  </fsexclude>
+</cluster>
+
+</syncdefinition>
