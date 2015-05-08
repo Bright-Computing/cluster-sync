@@ -9,6 +9,7 @@
 
 import sys, os, getopt, socket, time
 import pythoncm, traceback
+import time
 
 libraryPath = "/cm/local/apps/cmd/scripts/cloudproviders/amazon"
 if os.path.exists(libraryPath):
@@ -134,7 +135,6 @@ def sync(srcCluster, dstCluster, action, dstSoftwareImages,test = False, indent 
   dstPath = ""
   if typ == "Category":
     newfslist = []
-    
     if dstObject:
       newfslist = []
       remotefsMounts=dstObject.fsmounts
@@ -288,6 +288,23 @@ def sync(srcCluster, dstCluster, action, dstSoftwareImages,test = False, indent 
   # dstObject is ready (sync'ed or cloned), we can now commit it
   debug(spaces(indent) + "Going to commit " + dstCluster.name + "." + dstObjName)
   commitRes = dstObject.commit()
+  if typ == "Category":
+    doPrint(spaces(indent) + "Cloning monitoring configuration")
+    time.sleep(20)
+    srcmc = srcCluster.findByKey(srcObject.monConfId)
+
+    dstmc = dstCluster.findByKey(dstObject.monConfId)
+    for x in srcmc.metrics:  
+      y = x.clone()
+      dstmc.metrics += [y]
+
+    for x in srcmc.checks:
+      y = x.clone()
+      dstmc.checks += [y] 
+    dstCluster.add(dstmc)
+    dstmc.commit()
+    
+    commitRes = dstObject.commit()
   if not commitRes.result or commitRes.count:
     if not commitRes.result:
       doPrint(spaces(indent) + "Error committing " + dstCluster.name + "." + dstObjName)
