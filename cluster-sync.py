@@ -43,12 +43,14 @@ def usage():
   Usage: %s -f <file> -x <exclude> [-v -d -n]
 
   Options
-    -f | --file <file>  Synchronization definition file
-    -v | --verbose     Be verbose in output 
-    -x | --exclude <rsync exclude list file>  List of files that should be excluded from Rsync operations
-    -d | --dry     Perform  a dry run
+    -f | --file <file>         Synchronization definition file
+    -v | --verbose             Be verbose in output 
+    -x | --exclude <file>      List of files that should be excluded from Rsync operations
+    -d | --dry                 Perform  a dry run
     -n | --preserve-fsmounts   Preserve FSMounts on target head node.
+    -r | --preserve-roles      Preserve roles on target head node 's categories.
   """ % (sys.argv[0])
+
   sys.exit(1)
 
 
@@ -68,7 +70,7 @@ def translateType(type):
     type = "OpenLavaJobQueue"
   elif type == "slurmjobqueue":
     type = "SlurmJobQueue"
-  elif type == "monitorconfiguration":
+  elif type == "monitoringconfiguration":
     type = "MonConf"
   elif type == "metric":
     type = "Metric"
@@ -84,58 +86,79 @@ def spaces(nr):
   return " ".ljust(nr, ' ')
 
 
-def isFromCollection(cluster, object):
+def isFromCollection(obj):
   className = ""
-  if type(object) == type(pythoncm.Metric()):
-    className = object.metricClass.name
-  elif type(object) == type(pythoncm.HealthCheck()):
-    className = object.healthCheckClass.name
+  if type(obj) == type(pythoncm.Metric()):
+    className = obj.metricClass
+  elif type(obj) == type(pythoncm.HealthCheck()):
+    className = obj.healthCheckClass
   else:
     # Shouldn't arrive here actually
     return False
-  if className == "PROTOTYPE":
+  if className == pythoncm.PROTOTYPE or obj.command == "":
     return False
 
-  checks = cluster.getAll("HealthCheck")
-  metrics = cluster.getAll("Metric")
+  metrics = obj.cluster.getAll("Metric")
   for m in metrics:
-    if m.metricClass.name == "PROTOTYPE" and m.command == object.command:
-      # TODO: fix issue with MonConf
-      return False
-      return m.name
+    if m.metricClass == pythoncm.PROTOTYPE and m.command == obj.command:
+      return True
+  checks = obj.cluster.getAll("HealthCheck")
   for c in checks:
-    if c.healthCheckClass.name == "PROTOTYPE" and c.command == object.command:
-      # TODO: fix issue with MonConf
-      return False
-      return c.name
+    if c.healthCheckClass == pythoncm.PROTOTYPE and c.command == obj.command:
+      return True
 
   return False
 
 
-def sync(srcCluster, dstCluster, action, dstSoftwareImages,test = False, indent = 4,doDryRun=0,myrsyncExcludeList=0,fsExcludeList=[]):
+def sync(srcCluster, dstCluster, action, dstSoftwareImages, test = False, indent = 4, doDryRun = 0, myrsyncExcludeList = 0, fsExcludeList = [], preserveRoles=0):
   typ = action["type"]
   typ = translateType(typ)
   srcObjName = action["src"]
   dstObjName = action["dest"]
+  print srcObjName
+
+  if srcObjName == "*":
+    if (dstObjName != "*"):
+      doPrint(spaces(indent) + "Error: when cloning everything:* destination must also be *, not '%s'" % dstObjName)
+      return False
+    else:
+      everything = srcCluster.getAll(typ)
+      doPrint(spaces(indent) + "Cloning all %d %s" % (len(everything), action["type"]))
+      for one in everything:
+        actionClone = dict(action)
+        actionClone["src"] = one.resolveName()
+        actionClone["dest"] = one.resolveName()
+        if not sync(srcCluster, dstCluster, actionClone, dstSoftwareImages, test, indent, doDryRun, myrsyncExcludeList, fsExcludeList):
+          return False
+      return True
+    
   if test:
     debug(spaces(indent) + "Test local." + srcObjName + " -> " + dstCluster.name + "." + dstObjName)
   else:
     doPrint(spaces(indent) + "Syncing local." + typ + "." + srcObjName + " to " + dstCluster.name + "." + typ + "." + dstObjName)
   indent += 2    
   srcObject = srcCluster.find(srcObjName, typ)
-  dstObject = dstCluster.find(dstObjName, typ)
+  dstObject = dstCluster.find(dstObjName, typ)  
+
+
 
   if not srcObject:
     doPrint(spaces(indent) + "local." + srcObjName + " not found")
     return False
-  if not dstObject and not test:
-    doPrint(spaces(indent) + dstCluster.name + "." + dstObjName + " will be created")
-    
+  if not dstObject:
+    if isFromCollection(srcObject):
+      doPrint(spaces(indent) + dstCluster.name + "." + dstObjName + " will be skipped, it is derived from a collection script")
+      return True
+    if not test:
+      doPrint(spaces(indent) + dstCluster.name + "." + dstObjName + " will be created, from collection")
+
   srcPath = ""
   dstPath = ""
   if typ == "Category":
+#    doPrint(spaces(indent) + "Image uniqueKey " + str(srcObject.softwareImage.uniqueKey) + "->" + str(dstObject.softwareImage.uniqueKey))
     newfslist = []
     if dstObject:
+      curRoles=dstObject.roles
       newfslist = []
       remotefsMounts=dstObject.fsmounts
       doPrint(spaces(indent) + "Destination object contains FSMounts. I will preserve them.")
@@ -151,7 +174,9 @@ def sync(srcCluster, dstCluster, action, dstSoftwareImages,test = False, indent 
       else:
         newfslist=srcObject.fsmounts
     srcObject.fsmounts = newfslist 
-
+    dstImg=dstCluster.find(srcObject.softwareImage.name,"SoftwareImage")
+    #print type(dstImg)
+    #print dstObject.softwareImage.name
   if typ == "SoftwareImage":
     if not dstObject:
       proposal = os.path.dirname(srcObject.path) + "/" + dstObjName
@@ -164,6 +189,8 @@ def sync(srcCluster, dstCluster, action, dstSoftwareImages,test = False, indent 
           
       dstPath = proposal
     else:
+      dstObject.revisionsList = []
+      dstObject.parentSoftwareImage = None
       dstPath = dstObject.path
     if test:
       # we will use this later in 'non-test' phase of this function
@@ -171,10 +198,10 @@ def sync(srcCluster, dstCluster, action, dstSoftwareImages,test = False, indent 
     dstPath = [dstPath]
     srcPath = srcObject.path + "/"
   elif typ == "Metric" or typ == "HealthCheck":
-    res = isFromCollection(srcCluster, srcObject)
+    res = isFromCollection(srcObject)
     if res:
       if not test:
-        doPrint(spaces(indent) + "Not processing " + srcObjName + ": it is derived from a metriccollection script (" + res + ")")
+        doPrint(spaces(indent) + "Not processing " + srcObjName + ": it is derived from a metriccollection script (" + str(res) + ")")
       return True
     srcPath = srcObject.command
     dstPath = []
@@ -186,7 +213,7 @@ def sync(srcCluster, dstCluster, action, dstSoftwareImages,test = False, indent 
   if test:
     return True
 
-  if type(srcPath) == type(""): # for a metric, healthcheck or software image, some files have to be copied. Done here:
+  if (type(srcPath) == str) and (srcPath != "") and (srcPath[0] != '@'): # for a metric, healthcheck or software image, some files have to be copied. Done here:
     if not os.path.exists(srcPath):
       # Also metrics and health checks are taken from the headnodes root directory
       doPrint(spaces(indent) + "Path defined in local." + srcObjName + " not found: " + srcPath)
@@ -240,12 +267,62 @@ def sync(srcCluster, dstCluster, action, dstSoftwareImages,test = False, indent 
         else:
           debug(spaces(indent) + "copying " + srcPath + " to " + dstCluster.name + " succeeded")
 
-  if dstObject: # synchronize
+  if typ == "MonConf":
+    if not dstObject:
+      doPrint(spaces(indent) + "Remote monitoring configuration " + srcObjName + " not found, full clone is not allowed.")
+      return False
+    doPrint(spaces(indent) + "Going to sync monitoring configuration local." + srcObjName + " -> " + dstCluster.name + "." + dstObjName)
+    
+    subindent = indent + 2
+    r = []
+    for x in srcObject.metrics:
+      if isFromCollection(x.metric):
+        doPrint(spaces(subindent) +  "not syncing %s: derived from a metric collection" % x.metric.name)
+      elif dstCluster.find(x.metric.name, "Metric") == None:
+        doPrint(spaces(subindent) +  "not syncing %s: metric not defined on targer cluster" % x.metric.name)
+      else:
+        r.append(x.clone())
+    dstObject.metrics = r
+    
+    r = []
+    for x in srcObject.checks:
+      if isFromCollection(x.healthcheck):
+        doPrint(spaces(subindent) +  "not syncing %s: derived from a metric collection" % x.healthcheck.name)
+      elif dstCluster.find(x.healthcheck.name, "HealthCheck") == None:
+        doPrint(spaces(subindent) +  "not syncing %s: health check not defined on targer cluster" % x.healthcheck)
+      else:
+        r.append(x.clone())
+    dstObject.checks = r
+    
+    # testing
+    debug(spaces(subindent) + "Test monitoring configuration")
+    i = 0;
+    for x in dstObject.metrics:
+      if x.metric == None:
+        debug(spaces(subindent + 2) +  "Metric %d: not found @ %s" % (i, x.cluster.name))
+      i += 1
+    i = 0;
+    for x in dstObject.checks:
+      if x.healthcheck == None:
+        debug(spaces(subindent + 2) +  "Check %d: %s (%d) @ %s " % (i, x.healthcheck.name, x.metric.uniqueKey, x.cluster.name))
+      i += 1
+    
+    debug(spaces(subindent) +  "Cloned %d/%d metrics, %d/%d health checks" % (len(dstObject.metrics), len(srcObject.metrics), len(dstObject.checks), len(srcObject.checks)))
+    syncRes = True    
+  elif dstObject: # synchronize
     properties = srcObject.getProperties(False)
+    if typ == "Category":
+      for i in ["softwareImageProxy", "fspartAssociations"]:
+        properties.remove(i)
     debug(spaces(indent) + "Going to sync local." + srcObjName + " -> " + dstCluster.name + "." + dstObjName)
+    dstObject.synchronizeFrom(srcObject, properties)
     syncRes = dstObject.synchronizeFrom(srcObject, properties)
     if typ == "Category":
+      #print dstImg + " " + dstImg.name
+      dstObject.setSoftwareImage(dstImg.name) 
       dstObject.fsmounts=newfslist
+      if curRoles and preserveRoles:
+        dstObject.roles=curRoles
     if not syncRes:
       doPrint(spaces(indent) + "Syncing local." + srcObjName + " -> " + dstCluster.name + "." + dstObjName + " failed")
       err = srcCluster.getLastError()
@@ -257,7 +334,6 @@ def sync(srcCluster, dstCluster, action, dstSoftwareImages,test = False, indent 
       return False
     else:
       debug(spaces(indent) + "Synced local." + srcObjName + " -> " + dstCluster.name + "." + dstObjName)
-
   else: # no such object at remote side. Clone it
     debug(spaces(indent) + "Going to clone local." + srcObjName + " -> " + dstCluster.name + "." + dstObjName)
     dstObject = srcObject.clone()
@@ -273,6 +349,8 @@ def sync(srcCluster, dstCluster, action, dstSoftwareImages,test = False, indent 
     dstObject.name = dstObjName
     if typ == "SoftwareImage":
       dstObject.path = dstPath[0]
+      dstObject.parentSoftwareImage = None
+      dstObject.revisionsList = []
     res = dstCluster.add(dstObject)
     if not res:
       doPrint(spaces(indent) + "Adding local." + srcObjName + " -> " + dstCluster.name + "." + dstObjName + " failed")
@@ -288,23 +366,6 @@ def sync(srcCluster, dstCluster, action, dstSoftwareImages,test = False, indent 
   # dstObject is ready (sync'ed or cloned), we can now commit it
   debug(spaces(indent) + "Going to commit " + dstCluster.name + "." + dstObjName)
   commitRes = dstObject.commit()
-  if typ == "Category":
-    doPrint(spaces(indent) + "Cloning monitoring configuration")
-    time.sleep(20)
-    srcmc = srcCluster.findByKey(srcObject.monConfId)
-
-    dstmc = dstCluster.findByKey(dstObject.monConfId)
-    for x in srcmc.metrics:  
-      y = x.clone()
-      dstmc.metrics += [y]
-
-    for x in srcmc.checks:
-      y = x.clone()
-      dstmc.checks += [y] 
-    dstCluster.add(dstmc)
-    dstmc.commit()
-    
-    commitRes = dstObject.commit()
   if not commitRes.result or commitRes.count:
     if not commitRes.result:
       doPrint(spaces(indent) + "Error committing " + dstCluster.name + "." + dstObjName)
@@ -315,6 +376,7 @@ def sync(srcCluster, dstCluster, action, dstSoftwareImages,test = False, indent 
   string = "Committed local." + srcObjName + " -> " + dstCluster.name + "." + dstObjName
   string += ": sync=" + str(syncRes) + ", commit=" + str(commitRes.result != 0)
   debug(spaces(indent) + string)
+    
   return commitRes.result != 0
 
 
@@ -353,7 +415,7 @@ def mySort(actions, order):
   
 
 try:
-  options, arguments = getopt.getopt(sys.argv[1:], 'f:vx:dn', ['file', 'verbose','exclude','dry','preserve-fsmounts'])
+  options, arguments = getopt.getopt(sys.argv[1:], 'f:vx:dnr', ['file', 'verbose','exclude','dry','preserve-fsmounts','reserve-roles'])
   if len(options) == 0:
     usage()
 except getopt.GetoptError, err:
@@ -375,6 +437,10 @@ for opt, arg in options:
   elif opt in ('-n', '--preserve-fsmounts'):
     global preserveMounts
     preserveMounts = 1
+  elif opt in ('-r', '--preserve-roles'):
+    global preserveRoles
+    preserveRoles = 1
+
 
 if not syncXmlFile:
   usage()
@@ -509,7 +575,7 @@ for cluster in remoteClusters:
   
   doPrint(spaces(2) + "Processing synchronization actions for " + name)
   actions = value(cluster, "action", [])
-  actions = mySort(actions, ["softwareimage", "network", "category", "sgejobqueue", "slurmjobqueue", "pbsprojobqueue", "openlavajobqueue", "metric", "healthcheck", "monitorconfiguration"])
+  actions = mySort(actions, ["softwareimage", "network", "category", "sgejobqueue", "slurmjobqueue", "pbsprojobqueue", "openlavajobqueue", "metric", "healthcheck", "monitoringconfiguration"])
 
   try:
     _rsyncExcludeList
@@ -531,13 +597,20 @@ for cluster in remoteClusters:
     preserveMounts=0
   else:
     doPrint(spaces(2) + "Will attempt to preserve already defined FSMounts")
+  try:
+    preserveRoles
+  except NameError:
+    preserveRoles=0
+  else:
+    doPrint(spaces(2) + "Will attempt to preserve already defined roles")
+
 
   #### Test phase, whether all requested objects are valid
   ok = True
   dstSoftwareImages = [] # will be used set in test phase, and used in next stage
   for action in actions:
     if action["name"] == "sync":
-      ok = ok & sync(localCluster, connection, action, dstSoftwareImages, True,4,0,_rsyncExcludeList)
+      ok = ok & sync(localCluster, connection, action, dstSoftwareImages, True, 4, 0, _rsyncExcludeList)
     else:
       doPrint(spaces(4) + "Error: action " + action["name"] + " is not supported")
       ok = False
@@ -549,14 +622,19 @@ for cluster in remoteClusters:
   ok = True
   for action in actions:
     if action["name"] == "sync":
-      ok = ok & sync(localCluster, connection, action, dstSoftwareImages,False,4,_doDryRun,_rsyncExcludeList,fslist)
+      ok = ok & sync(localCluster, connection, action, dstSoftwareImages, False, 4, _doDryRun, _rsyncExcludeList, fslist, preserveRoles)
     else:
       doPrint(spaces(4) + "Error: action " + action["name"] + " is not supported")
   if ok:
     doPrint(spaces(2) + "Synchronization of " + name + " succeeded")
   else:
     doPrint(spaces(2) + "Errors occured while synchronizing " + name)
-    
+  nodes = connection.getAll('node')
+  for node in nodes:
+    if node.childType != 'MasterNode':
+      node.restartRequired()
+      node.open("", False)
+ 
   if not connection.disconnect():
     debug(spaces(2) + "Waring: disconnect from " + name + " failed")
 
