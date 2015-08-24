@@ -83,18 +83,18 @@ You can select which objects get replicated  by editing the synchronization defi
 The source path is e.g. /cm/images/test-image and the destination is target_headnode:/cm/images/test-image
 
 So the exclude list file could be :
-
+```
 etc/sssd/sssd.conf (relative path)
-
+```
 or 
-
+```
 - etc/sssd/sssd.conf
-
+```
 
 Or use absolute paths e.g.
-
+```
 - /usr
-
+```
 (/cm/images/test-image/usr will not be synced on the target)
 
 In the first case both /cm/images/test-image/etc/sssd/sssd.conf and e.g. /cm/images/test-image/root/backup/etc/sssd/sssd.conf (all paths ending with that pattern) will be excluded.
@@ -102,5 +102,6 @@ In the first case both /cm/images/test-image/etc/sssd/sssd.conf and e.g. /cm/ima
 The format is the same as for the exclude lists that you define for node categories. The only difference is that you cannot uses the no-new files directive.
 
 
-
+```
 no-new-files: - /tftpboot/*
+```
