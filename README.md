@@ -105,3 +105,7 @@ The format is the same as for the exclude lists that you define for node categor
 ```
 no-new-files: - /tftpboot/*
 ```
+
+# Additional options for node categories
+
+In certain cases it might be desirable to exclude certain node categories attributes from being replicated. The current version allows you to skip the synchronization of file system mounts and/or roles associated with a node category.
