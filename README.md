@@ -4,10 +4,10 @@ ckuster-sync is a tool to replicate a single "master" Bright cluster to one or m
 
 # Download and install the distribution
 
-'''
+```
 yum install git
 git clone https://github.com/plabrop/cluster-sync.git
-'''
+```
 
 # Make sure you're running latest version of Bright
 
