@@ -1,6 +1,6 @@
 <syncdefinition>
 <local>
-  <host>localhost</host>
+  <host>source-headnode.example.com</host>
   <brightport>8081</brightport>
 
   <brightcert>
@@ -11,28 +11,28 @@
 
 
 <cluster array="yes">
-  <name>usmd-prd-brhn01</name>
-  <host>10.240.10.10</host>
+  <name>target-headnode.example.com</name>
+  <host>10.141.100.254</host>
   <brightport>8081</brightport>
   <sshport>22</sshport>
 
   <brightcert>
-    <pemfile>/cm/shared/illumina/replica/keys/usmd-prd-brhn01.pem</pemfile>
-    <keyfile>/cm/shared/illumina/replica/keys/usmd-prd-brhn01.key</keyfile>
+    <pemfile>/root/cluster/keys/target-headnode.pem</pemfile>
+    <keyfile>//root/cluster/keys/target-headnode.key</keyfile>
   </brightcert>
 
   <action array="yes">
     <name>sync</name>
     <type>softwareimage</type>
-    <src>ilmn-compute</src>
-    <dest>ilmn-compute</dest>
+    <src>image-compute</src>
+    <dest>image-compute</dest>
   </action>
 
   <action array="yes">
     <name>sync</name>
     <type>softwareimage</type>
-    <src>ilmn-login</src>
-    <dest>ilmn-login</dest>
+    <src>image-gpunodes</src>
+    <dest>image-gpunodes</dest>
   </action>
 
   <action>
@@ -52,29 +52,29 @@
   <action>
     <name>sync</name>
     <type>category</type>
-    <src>compute-whole</src>
-    <dest>compute-whole</dest>
+    <src>compute-nodecat</src>
+    <dest>compute-nodecat</dest>
   </action>
 
   <action>
     <name>sync</name>
     <type>MonitoringConfiguration</type>
-    <src>compute-whole</src>
-    <dest>compute-whole</dest>
+    <src>compute-nodecat</src>
+    <dest>compute-nodecat</dest>
   </action>
 
   <action>
     <name>sync</name>
     <type>category</type>
-    <src>compute-slice</src>
-    <dest>compute-slice</dest>
+    <src>compute-gpucat</src>
+    <dest>compute-gpucat</dest>
   </action>
 
   <action>
     <name>sync</name>
     <type>MonitoringConfiguration</type>
-    <src>compute-slice</src>
-    <dest>compute-slice</dest>
+    <src>compute-gpucat</src>
+    <dest>compute-gpucat</dest>
   </action>
 
   <action>
