@@ -9,36 +9,88 @@
   </brightcert>
 </local>
 
+
 <cluster array="yes">
-  <name>Test Cluster</name>
-  <host>10.2.59.120</host>
+  <name>usmd-prd-brhn01</name>
+  <host>10.240.10.10</host>
   <brightport>8081</brightport>
   <sshport>22</sshport>
 
   <brightcert>
-    <pemfile>/root/tst/.cm/admin.pem</pemfile>
-    <keyfile>/root/tst/.cm/admin.key</keyfile>
+    <pemfile>/cm/shared/illumina/replica/keys/usmd-prd-brhn01.pem</pemfile>
+    <keyfile>/cm/shared/illumina/replica/keys/usmd-prd-brhn01.key</keyfile>
   </brightcert>
 
-  <!-- 
-  Replicate the software image "replicate-image" from the master cluster to the replica cluster.
-  -->
-  <action>
+  <action array="yes">
     <name>sync</name>
     <type>softwareimage</type>
-    <src>test-image</src>
-    <dest>test-image</dest>
+    <src>ilmn-compute</src>
+    <dest>ilmn-compute</dest>
   </action>
+
+  <action array="yes">
+    <name>sync</name>
+    <type>softwareimage</type>
+    <src>ilmn-login</src>
+    <dest>ilmn-login</dest>
+  </action>
+
+  <action>
+    <name>sync</name>
+    <type>Metric</type>
+    <src>*</src>
+    <dest>*</dest>
+  </action>
+
+  <action>
+    <name>sync</name>
+    <type>HealthCheck</type>
+    <src>*</src>
+    <dest>*</dest>
+  </action>
+
   <action>
     <name>sync</name>
     <type>category</type>
-    <src>replica</src>
-    <dest>replica</dest>
-  </action> 
-  <fsexclude>
-    <fs>/home</fs>
-    <fs>/cm/shared</fs>
-  </fsexclude>
+    <src>compute-whole</src>
+    <dest>compute-whole</dest>
+  </action>
+
+  <action>
+    <name>sync</name>
+    <type>MonitoringConfiguration</type>
+    <src>compute-whole</src>
+    <dest>compute-whole</dest>
+  </action>
+
+  <action>
+    <name>sync</name>
+    <type>category</type>
+    <src>compute-slice</src>
+    <dest>compute-slice</dest>
+  </action>
+
+  <action>
+    <name>sync</name>
+    <type>MonitoringConfiguration</type>
+    <src>compute-slice</src>
+    <dest>compute-slice</dest>
+  </action>
+
+  <action>
+    <name>sync</name>
+    <type>category</type>
+    <src>login</src>
+    <dest>login</dest>
+  </action>
+
+  <action>
+    <name>sync</name>
+    <type>MonitoringConfiguration</type>
+    <src>login</src>
+    <dest>login</dest>
+  </action>
+
 </cluster>
 
 </syncdefinition>
