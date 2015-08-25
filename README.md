@@ -109,3 +109,104 @@ no-new-files: - /tftpboot/*
 # Additional options for node categories
 
 In certain cases it might be desirable to exclude certain node categories attributes from being replicated. The current version allows you to skip the synchronization of file system mounts and/or roles associated with a node category.
+
+# Sample definition file
+
+```xml
+<syncdefinition>
+<local>
+  <host>source-headnode.example.com</host>
+  <brightport>8081</brightport>
+
+  <brightcert>
+    <pemfile>/root/.cm/admin.pem</pemfile>
+    <keyfile>/root/.cm/admin.key</keyfile>
+  </brightcert>
+</local>
+
+
+<cluster array="yes">
+  <name>target-headnode.example.com</name>
+  <host>10.141.100.254</host>
+  <brightport>8081</brightport>
+  <sshport>22</sshport>
+
+  <brightcert>
+    <pemfile>/root/cluster/keys/target-headnode.pem</pemfile>
+    <keyfile>//root/cluster/keys/target-headnode.key</keyfile>
+  </brightcert>
+
+  <action array="yes">
+    <name>sync</name>
+    <type>softwareimage</type>
+    <src>image-compute</src>
+    <dest>image-compute</dest>
+  </action>
+
+  <action array="yes">
+    <name>sync</name>
+    <type>softwareimage</type>
+    <src>image-gpunodes</src>
+    <dest>image-gpunodes</dest>
+  </action>
+
+  <action>
+    <name>sync</name>
+    <type>Metric</type>
+    <src>*</src>
+    <dest>*</dest>
+  </action>
+
+  <action>
+    <name>sync</name>
+    <type>HealthCheck</type>
+    <src>*</src>
+    <dest>*</dest>
+  </action>
+
+  <action>
+    <name>sync</name>
+    <type>category</type>
+    <src>compute-nodecat</src>
+    <dest>compute-nodecat</dest>
+  </action>
+
+  <action>
+    <name>sync</name>
+    <type>MonitoringConfiguration</type>
+    <src>compute-nodecat</src>
+    <dest>compute-nodecat</dest>
+  </action>
+
+  <action>
+    <name>sync</name>
+    <type>category</type>
+    <src>compute-gpucat</src>
+    <dest>compute-gpucat</dest>
+  </action>
+
+  <action>
+    <name>sync</name>
+    <type>MonitoringConfiguration</type>
+    <src>compute-gpucat</src>
+    <dest>compute-gpucat</dest>
+  </action>
+
+  <action>
+    <name>sync</name>
+    <type>category</type>
+    <src>login</src>
+    <dest>login</dest>
+  </action>
+
+  <action>
+    <name>sync</name>
+    <type>MonitoringConfiguration</type>
+    <src>login</src>
+    <dest>login</dest>
+  </action>
+
+</cluster>
+
+</syncdefinition>
+```
