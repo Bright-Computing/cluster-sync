@@ -1,6 +1,6 @@
 # cluster-sync
 
-ckuster-sync is a tool to replicate a single "master" Bright cluster to one or more "replica" clusters. This solution does not replicate all the objects defined in CMDaemon, Instead,  you control what gets replicated through a synchronization definition file. It can be extended to replicate many additional cluster object types (including multiples of each type) to as many remote cluster as you desire. 
+cluster-sync is a tool to replicate a single "master" Bright cluster to one or more "replica" clusters. This solution does not replicate all the objects defined in CMDaemon, Instead,  you control what gets replicated through a synchronization definition file. It can be extended to replicate many additional cluster object types (including multiples of each type) to as many remote cluster as you desire. 
 
 # Download and install the distribution
 
